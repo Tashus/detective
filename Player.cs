@@ -7,15 +7,26 @@ public class Player : MonoBehaviour {
 
 	public static string playerTag = "Player";
 
+
 	//CharacterController charCon;
 	Transform uiAnchor;
+	InputManager im;
 	ProximityTracker prox;
 
 	NavMeshAgent nav;
+	
+	float playerHeight = 2f;
 
 	Vector3 movement = Vector3.zero;
-	float maxSpeed = 2f;
-	float playerHeight = 2f;
+	float walkSpeed = 1.5f; // 3.3 mph
+	bool isRunning = false;
+	float runPace = 0f;
+	float minRunPace = 0.25f;
+	float runBoost = 2f; // 7.8 mph
+	bool isSneaking = false;
+	float sneakPace = 0f;
+	float minSneakPace = 0.2f;
+	float sneakLimit = 0.5f;
 
 	float crashMaxDistance = 10f;
 	float crashBaseAttentionDraw = 1f;
@@ -23,6 +34,7 @@ public class Player : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		uiAnchor = GameObject.Find ("UI Anchor").transform;
+		im = uiAnchor.GetComponent<InputManager>();
 		//charCon = GetComponent<CharacterController> ();
 		//GetComponent<NavMeshAgent> ().SetDestination (new Vector3 (30f, 0f, 10f));
 		prox = new GameObject().AddComponent<ProximityTracker>();
@@ -33,28 +45,21 @@ public class Player : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-		movement.Set (0f, 0f, 0f);
-		if (Input.GetKey (KeyCode.A)) {
-			movement += Vector3.left;
-		}
-		if (Input.GetKey (KeyCode.D)) {
-			movement += Vector3.right;
-		}
-		if (Input.GetKey (KeyCode.W)) {
-			movement += Vector3.forward;
-		}
-		if (Input.GetKey (KeyCode.S)) {
-			movement += Vector3.back;
-		}
-		if (Input.GetKeyDown (KeyCode.Space)) {
-			
-		}
+		uiAnchor.Translate (transform.position - uiAnchor.position);
 	}
 
 	void FixedUpdate() {
+		Vector2 moveInput = im.GetMoveInput();
+		movement.Set(moveInput.x, 0f, moveInput.y);
+		runPace = im.GetRun();
+		isRunning = runPace > minRunPace;
+		runPace = isRunning ? (runPace - minRunPace) / (1f - minRunPace) : 0f;
 		//charCon.SimpleMove (movement.normalized * maxSpeed);
-		nav.velocity = movement.normalized * maxSpeed;
-		uiAnchor.Translate (transform.position - uiAnchor.position);
+		sneakPace = im.GetSneak();
+		isSneaking = sneakPace > minSneakPace;
+		sneakPace = isSneaking ? (sneakPace - minSneakPace) / (1f - minSneakPace) : 0f;
+		float moveSpeed = Mathf.Clamp(movement.magnitude, 0f, 1f - sneakLimit * sneakPace) * (walkSpeed + runBoost * runPace);
+		nav.velocity = movement.normalized * moveSpeed;
 	}
 
 	public float GetHeight() {
@@ -67,7 +72,7 @@ public class Player : MonoBehaviour {
 
 	void OnTriggerEnter (Collider other) {
 		if (other.gameObject.CompareTag (Character.charTag)) {
-			if (Vector3.Angle(transform.forward, other.transform.forward) > 90f && nav.velocity.magnitude > maxSpeed * 0.25f) {
+			if (Vector3.Angle(transform.forward, other.transform.forward) > 90f && nav.velocity.magnitude > walkSpeed * 0.25f) {
 				Crash ();
 			} else {
 				other.GetComponent<Character> ().DrawAttention (transform.position, 30f, 5f);
